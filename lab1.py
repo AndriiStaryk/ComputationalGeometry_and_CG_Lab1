@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 from max_ellipse import (
-    generate_random_convex_polygon_method4,
-    find_inner_convex_hull,
+    generate_random_convex_polygon_method,
     find_inner_hull_via_inscribed_circle,
     find_max_inscribed_ellipse,
     find_max_inscribed_ellipse_star,
@@ -58,18 +57,6 @@ class EllipseApp:
         self.points_spinbox.grid(row=0, column=1, sticky=tk.W, padx=5)
         self.update_btn = ttk.Button(control_frame, text="Update", command=self.generate_polygon)
         self.update_btn.grid(row=0, column=2, padx=5)
-        
-        # Inner hull methods
-        ttk.Label(control_frame, text="Inner Hull Method:").grid(row=1, column=0, sticky=tk.W, pady=(10,0))
-        self.inner_method = tk.StringVar(value="star")
-        inner_methods = [
-            ("Inscribed circle approach", "2"),
-            ("Star-shaped approach (kernel)", "star")
-        ]
-        for i, (text, value) in enumerate(inner_methods):
-            ttk.Radiobutton(control_frame, text=text, value=value,
-                           variable=self.inner_method,
-                           command=self.update_inner_hull).grid(row=2+i, column=0, columnspan=3, sticky=tk.W)
 
     def create_plot_area(self):
         # Create frame for the plot
@@ -90,8 +77,8 @@ class EllipseApp:
 
     def generate_polygon(self):
         n_points = self.n_points.get()
-        self.polygon = generate_random_convex_polygon_method4(n_points)
-        self.update_inner_hull()
+        self.polygon = generate_random_convex_polygon_method(n_points)
+        self.update_ellipse()
 
     def is_polygon_convex(self, polygon):
         """Check if a polygon is convex by checking if all cross products have the same sign."""
@@ -119,29 +106,23 @@ class EllipseApp:
         
         return True
 
-    def update_inner_hull(self):
+    def update_ellipse(self):
         if self.polygon is None:
             return
         
-        method = self.inner_method.get()
         self.inner_hull = None
-        self.kernel_point = None
         self.C = None
         self.d = None
         
         try:
-            if method == "2":
-                self.inner_hull = find_inner_hull_via_inscribed_circle(self.polygon)
-                self.C, self.d = find_max_inscribed_ellipse(self.inner_hull)
-            elif method == "star":
-                # Use the star-shaped approach
-                self.kernel_point = find_kernel(self.polygon)
-                if self.kernel_point is None:
-                    raise ValueError("The polygon is not star-shaped or no kernel point could be found")
-                self.C, self.d = find_max_inscribed_ellipse_star(self.polygon)
+            # Try star-shaped approach first
+            self.kernel_point = find_kernel(self.polygon)
+            if self.kernel_point is None:
+                raise ValueError("The polygon is not star-shaped or no kernel point could be found")
+            self.C, self.d = find_max_inscribed_ellipse_star(self.polygon)
                     
         except Exception as e:
-            print(f"Error finding inscribed ellipse: {e}")
+            print(f"Error in star-shaped approach: {e}")
             # Fallback: try the inscribed circle approach
             try:
                 print("Trying fallback inscribed circle approach...")
@@ -163,18 +144,6 @@ class EllipseApp:
                         [self.polygon[-1,1], self.polygon[0,1]], 'b-', linewidth=2, alpha=0.7)
             self.ax.scatter(self.polygon[:, 0], self.polygon[:, 1], c='blue', s=30, alpha=0.7)
         
-        # Plot inner hull if using convex approach
-        if self.inner_hull is not None:
-            self.ax.plot(*self.inner_hull.T, 'g-', linewidth=2, label='Inner Convex Hull')
-            self.ax.plot([self.inner_hull[-1,0], self.inner_hull[0,0]], 
-                        [self.inner_hull[-1,1], self.inner_hull[0,1]], 'g-', linewidth=2)
-            self.ax.scatter(self.inner_hull[:, 0], self.inner_hull[:, 1], c='green', s=50)
-        
-        # Plot kernel point if using star-shaped approach
-        if self.kernel_point is not None:
-            self.ax.scatter(self.kernel_point[0], self.kernel_point[1], c='purple', s=100, 
-                          label='Kernel Point', marker='*')
-        
         # Plot inscribed ellipse
         if self.C is not None and self.d is not None:
             x, y = ellipse_points(self.C, self.d)
@@ -186,7 +155,7 @@ class EllipseApp:
         
         self.ax.axis('equal')
         self.ax.grid(True, alpha=0.3)
-        if self.polygon is not None and (self.inner_hull is not None or self.kernel_point is not None or self.C is not None):
+        if self.polygon is not None and self.C is not None:
             self.ax.legend()
         self.canvas.draw()
 

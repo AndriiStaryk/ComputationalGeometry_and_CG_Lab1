@@ -4,7 +4,7 @@ from scipy.spatial import ConvexHull
 from scipy.spatial.distance import cdist
 import cvxpy as cp
 
-def generate_random_convex_polygon_method4(n_points):
+def generate_random_convex_polygon_method(n_points):
     """Generate a more star-like polygon using variable radii at fixed angles"""
     # Create evenly spaced angles with some random variation
     base_angles = np.linspace(0, 2*np.pi, n_points + 1)[:-1]  # Remove duplicate 2π
